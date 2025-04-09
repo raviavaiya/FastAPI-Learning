@@ -1,0 +1,354 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Preprocessing and Visualization</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .container-fluid {
+            max-width: 1400px;
+        }
+        .card {
+            margin-bottom: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .chart-container {
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        .chart-container img {
+            max-width: 100%;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 2s linear infinite;
+            display: none;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .nav-tabs .nav-link {
+            border-radius: 8px 8px 0 0;
+        }
+        .nav-tabs .nav-link.active {
+            font-weight: bold;
+            background-color: #fff;
+            border-bottom-color: #fff;
+        }
+        #visualization-gallery {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .table-responsive {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .column-badge {
+            display: inline-block;
+            margin: 5px;
+            padding: 5px 10px;
+            border-radius: 20px;
+            background-color: #e9ecef;
+            cursor: pointer;
+        }
+        .column-badge.selected {
+            background-color: #0d6efd;
+            color: white;
+        }
+        .column-badge.numeric {
+            border-left: 4px solid #28a745;
+        }
+        .column-badge.categorical {
+            border-left: 4px solid #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <h1 class="text-center mb-4">Data Preprocessing and Visualization</h1>
+        
+        <!-- Upload Section -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Dataset Upload</h5>
+                <form id="upload-form">
+                    <div class="mb-3">
+                        <input type="file" class="form-control" id="file-input" accept=".csv,.xlsx,.xls" required>
+                        <div class="form-text">Supported formats: CSV, Excel (.xlsx, .xls)</div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-upload"></i> Upload
+                    </button>
+                </form>
+                <div id="upload-loader" class="loader"></div>
+                <div id="upload-feedback" class="alert mt-3" style="display: none;"></div>
+            </div>
+        </div>
+        
+        <!-- Main Content (hidden until file is uploaded) -->
+        <div id="main-content" style="display: none;">
+            <ul class="nav nav-tabs" id="myTab" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="data-tab" data-bs-toggle="tab" data-bs-target="#data" type="button" role="tab" aria-controls="data" aria-selected="true">
+                        <i class="fas fa-table"></i> Data Preview
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="preprocess-tab" data-bs-toggle="tab" data-bs-target="#preprocess" type="button" role="tab" aria-controls="preprocess" aria-selected="false">
+                        <i class="fas fa-cogs"></i> Preprocessing
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="visualize-tab" data-bs-toggle="tab" data-bs-target="#visualize" type="button" role="tab" aria-controls="visualize" aria-selected="false">
+                        <i class="fas fa-chart-bar"></i> Visualization
+                    </button>
+                </li>
+            </ul>
+            
+            <div class="tab-content" id="myTabContent">
+                <!-- Data Preview Tab -->
+                <div class="tab-pane fade show active" id="data" role="tabpanel" aria-labelledby="data-tab">
+                    <div class="card mt-3">
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h5 class="card-title">Dataset Information</h5>
+                                    <p><strong>Filename:</strong> <span id="data-filename"></span></p>
+                                    <p><strong>Rows:</strong> <span id="data-rows"></span></p>
+                                    <p><strong>Columns:</strong> <span id="data-columns-count"></span></p>
+                                    <div>
+                                        <strong>Column List:</strong>
+                                        <div id="data-columns-list" class="mt-2"></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <h5>Missing Values</h5>
+                                    <div id="missing-values" class="table-responsive">
+                                        <table class="table table-sm">
+                                            <thead>
+                                                <tr>
+                                                    <th>Column</th>
+                                                    <th>Missing Count</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="missing-values-body"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <h5 class="mt-4">Data Sample</h5>
+                            <div class="table-responsive">
+                                <table class="table table-striped table-hover" id="data-preview-table">
+                                    <thead id="data-preview-header"></thead>
+                                    <tbody id="data-preview-body"></tbody>
+                                </table>
+                            </div>
+                            
+                            <div class="mt-3">
+                                <button class="btn btn-success" id="download-btn">
+                                    <i class="fas fa-download"></i> Download Processed Data
+                                </button>
+                                <button class="btn btn-secondary" id="reset-btn">
+                                    <i class="fas fa-undo"></i> Reset to Original
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Preprocessing Tab -->
+                <div class="tab-pane fade" id="preprocess" role="tabpanel" aria-labelledby="preprocess-tab">
+                    <div class="row mt-3">
+                        <!-- Missing Values -->
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="card-title">Handle Missing Values</h5>
+                                    <form id="missing-values-form">
+                                        <div class="mb-3">
+                                            <label class="form-label">Select Columns</label>
+                                            <div id="missing-columns-selection"></div>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="missing-method" class="form-label">Method</label>
+                                            <select class="form-select" id="missing-method" required>
+                                                <option value="" selected disabled>Select method</option>
+                                                <option value="mean">Mean (numeric only)</option>
+                                                <option value="median">Median (numeric only)</option>
+                                                <option value="mode">Mode (most frequent value)</option>
+                                                <option value="constant">Fill with constant (0 or "unknown")</option>
+                                                <option value="drop_rows">Drop rows with missing values</option>
+                                            </select>
+                                        </div>
+                                        <button type="submit" class="btn btn-primary">Apply</button>
+                                    </form>
+                                    <div id="missing-values-loader" class="loader"></div>
+                                    <div id="missing-values-feedback" class="alert mt-3" style="display: none;"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Normalization -->
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="card-title">Normalize Data</h5>
+                                    <form id="normalize-form">
+                                        <div class="mb-3">
+                                            <label class="form-label">Select Numeric Columns</label>
+                                            <div id="normalize-columns-selection"></div>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="normalize-method" class="form-label">Method</label>
+                                            <select class="form-select" id="normalize-method" required>
+                                                <option value="" selected disabled>Select method</option>
+                                                <option value="minmax">Min-Max Scaling (0-1)</option>
+                                                <option value="standard">Standard Scaling (z-score)</option>
+                                                <option value="robust">Robust Scaling (using quantiles)</option>
+                                            </select>
+                                        </div>
+                                        <button type="submit" class="btn btn-primary">Apply</button>
+                                    </form>
+                                    <div id="normalize-loader" class="loader"></div>
+                                    <div id="normalize-feedback" class="alert mt-3" style="display: none;"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Categorical Encoding -->
+                        <div class="col-md-6 mt-4">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="card-title">Encode Categorical Data</h5>
+                                    <form id="encoding-form">
+                                        <div class="mb-3">
+                                            <label class="form-label">Select Categorical Columns</label>
+                                            <div id="categorical-columns-selection"></div>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="encoding-method" class="form-label">Method</label>
+                                            <select class="form-select" id="encoding-method" required>
+                                                <option value="" selected disabled>Select method</option>
+                                                <option value="onehot">One-Hot Encoding</option>
+                                                <option value="label">Label Encoding</option>
+                                            </select>
+                                        </div>
+                                        <button type="submit" class="btn btn-primary">Apply</button>
+                                    </form>
+                                    <div id="encoding-loader" class="loader"></div>
+                                    <div id="encoding-feedback" class="alert mt-3" style="display: none;"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Drop Columns -->
+                        <div class="col-md-6 mt-4">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="card-title">Drop Columns</h5>
+                                    <form id="drop-columns-form">
+                                        <div class="mb-3">
+                                            <label class="form-label">Select Columns to Drop</label>
+                                            <div id="drop-columns-selection"></div>
+                                        </div>
+                                        <button type="submit" class="btn btn-danger">Drop Selected Columns</button>
+                                    </form>
+                                    <div id="drop-columns-loader" class="loader"></div>
+                                    <div id="drop-columns-feedback" class="alert mt-3" style="display: none;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Visualization Tab -->
+                <div class="tab-pane fade" id="visualize" role="tabpanel" aria-labelledby="visualize-tab">
+                    <div class="card mt-3">
+                        <div class="card-body">
+                            <h5 class="card-title">Create Visualization</h5>
+                            <form id="visualization-form" class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label for="chart-type" class="form-label">Chart Type</label>
+                                    <select class="form-select" id="chart-type" required>
+                                        <option value="" selected disabled>Select chart type</option>
+                                        <option value="bar">Bar Chart</option>
+                                        <option value="histogram">Histogram</option>
+                                        <option value="scatter">Scatter Plot</option>
+                                        <option value="box">Box Plot</option>
+                                        <option value="line">Line Chart</option>
+                                        <option value="heatmap">Correlation Heatmap</option>
+                                        <option value="pairplot">Pair Plot</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="col-md-4 mb-3">
+                                    <label for="x-column" class="form-label">X-Axis Column</label>
+                                    <select class="form-select" id="x-column" required>
+                                        <option value="" selected disabled>Select column</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="col-md-4 mb-3">
+                                    <label for="y-column" class="form-label">Y-Axis Column</label>
+                                    <select class="form-select" id="y-column">
+                                        <option value="" selected disabled>Select column (optional)</option>
+                                    </select>
+                                    <small class="form-text text-muted">Required for Bar, Scatter, Box, and Line charts</small>
+                                </div>
+                                
+                                <div class="col-md-8 mb-3">
+                                    <label for="chart-title" class="form-label">Chart Title</label>
+                                    <input type="text" class="form-control" id="chart-title" placeholder="Enter chart title" required>
+                                </div>
+                                
+                                <div class="col-md-4 mb-3">
+                                    <label for="hue-column" class="form-label">Color By (Hue)</label>
+                                    <select class="form-select" id="hue-column">
+                                        <option value="" selected disabled>Select column (optional)</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="col-12">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-chart-line"></i> Create Visualization
+                                    </button>
+                                </div>
+                            </form>
+                            <div id="visualization-loader" class="loader"></div>
+                            <div id="visualization-feedback" class="alert mt-3" style="display: none;"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Visualization Gallery -->
+                    <div id="visualization-gallery"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Custom JavaScript -->
+    <script src="/static/js/main.js"></script>
+</body>
+</html>
+    
